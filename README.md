@@ -34,7 +34,7 @@ SnapInsight is a highly efficient smart vision workflow tool built on Python Fla
 #### 1. Clone the Repository
 ```bash
 git clone https://github.com/omnisi2019/SnapInsight.git
-cd SanpInsight
+cd SnapInsight
 ```
 
 #### 2. Configure Environment Variables
@@ -100,7 +100,7 @@ SnapInsight 是一個高效的智慧視覺工作流工具，基於 Python Flask 
 #### 1. 複製專案
 ```bash
 git clone https://github.com/omnisi2019/SnapInsight.git
-cd SanpInsight
+cd SnapInsight
 ```
 
 #### 2. 設定環境變數
