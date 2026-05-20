@@ -27,8 +27,8 @@ SnapInsight 是一個高效的智慧視覺工作流工具，基於 Python Flask 
 
 ### 1. 複製專案
 ```bash
-git clone <your-repo-url>
-cd ocr
+git clone https://github.com/omnisi2019/SnapInsight.git
+cd SanpInsight
 ```
 
 ### 2. 設定環境變數
