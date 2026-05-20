@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SnapInsight</title>
+    <style>
+        :root {
+            --primary-color: #007AFF;
+            --bg-color: #f5f5f7;
+            --chat-bg: #ffffff;
+            --text-color: #333;
+            --border-radius: 12px;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+
+        .container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            max-width: 800px;
+            margin: 0 auto;
+            width: 100%;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+
+        #output-container {
+            flex: 1;
+            background: var(--chat-bg);
+            border-radius: var(--border-radius);
+            padding: 20px;
+            overflow-y: auto;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+            margin-bottom: 20px;
+            white-space: pre-wrap;
+            position: relative;
+        }
+
+        .input-area {
+            background: var(--chat-bg);
+            border-radius: var(--border-radius);
+            padding: 15px;
+            box-shadow: 0 -2px 10px rgba(0,0,0,0.05);
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .preview-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .preview-item {
+            position: relative;
+            width: 80px;
+            height: 80px;
+            border-radius: 8px;
+            overflow: hidden;
+            border: 1px solid #ddd;
+        }
+
+        .preview-item img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .preview-item .remove-btn {
+            position: absolute;
+            top: 2px;
+            right: 2px;
+            background: rgba(0,0,0,0.5);
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            cursor: pointer;
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .controls {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        #drop-zone {
+            flex: 1;
+            height: 50px;
+            border: 2px dashed #ccc;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #888;
+            cursor: pointer;
+            transition: border-color 0.3s;
+        }
+
+        #drop-zone.dragover {
+            border-color: var(--primary-color);
+            color: var(--primary-color);
+        }
+
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: opacity 0.2s;
+        }
+
+        .btn-primary {
+            background-color: var(--primary-color);
+            color: white;
+        }
+
+        .btn-secondary {
+            background-color: #e5e5ea;
+            color: #000;
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .copy-btn {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+        }
+
+        #file-input {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div id="output-container">
+            <button id="copy-btn" class="btn btn-secondary copy-btn" style="display: none;">複製</button>
+            <div id="output-text">等待上傳圖片...</div>
+            <div id="translation-area" style="display: none; margin-top: 20px; border-top: 1px solid #eee; padding-top: 15px;">
+                <div style="font-weight: bold; margin-bottom: 5px; font-size: 14px; color: #666;">翻譯結果 (繁體中文):</div>
+                <div id="translation-text" style="white-space: pre-wrap;"></div>
+            </div>
+        </div>
+
+        <div class="input-area">
+            <div class="preview-container" id="preview-container"></div>
+            <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 15px; font-size: 14px; margin-bottom: 10px;">
+                <div style="display: flex; align-items: center; gap: 5px;">
+                    <input type="checkbox" id="auto-google-ai" style="cursor: pointer;">
+                    <label for="auto-google-ai" style="cursor: pointer; user-select: none;">Auto Google AI Mode</label>
+                </div>
+                <input type="text" id="user-prompt" placeholder="輸入額外提示詞 (選用)..." style="flex: 1; min-width: 150px; padding: 8px; border: 1px solid #ddd; border-radius: 8px;">
+                <div style="display: flex; align-items: center; gap: 5px;">
+                    <input type="checkbox" id="translate-zh" style="cursor: pointer;">
+                    <label for="translate-zh" style="cursor: pointer; user-select: none;">翻譯成繁體中文</label>
+                </div>
+            </div>
+            <div class="controls">
+                <button class="btn btn-secondary" onclick="document.getElementById('file-input').click()">+</button>
+                <input type="file" id="file-input" accept="image/*">
+                <div id="drop-zone">拖曳或貼上圖片到這裡</div>
+                <button id="send-btn" class="btn btn-primary" disabled>傳送</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const fileInput = document.getElementById('file-input');
+        const dropZone = document.getElementById('drop-zone');
+        const previewContainer = document.getElementById('preview-container');
+        const sendBtn = document.getElementById('send-btn');
+        const outputText = document.getElementById('output-text');
+        const copyBtn = document.getElementById('copy-btn');
+        const autoGoogleCheckbox = document.getElementById('auto-google-ai');
+        const translateZhCheckbox = document.getElementById('translate-zh');
+        const userPromptInput = document.getElementById('user-prompt');
+        const translationArea = document.getElementById('translation-area');
+        const translationText = document.getElementById('translation-text');
+        
+        let selectedFile = null;
+
+        // Handle file selection
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                handleFile(e.target.files[0]);
+            }
+        });
+
+        // Handle drag and drop
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.classList.add('dragover');
+        });
+
+        dropZone.addEventListener('dragleave', () => {
+            dropZone.classList.remove('dragover');
+        });
+
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('dragover');
+            if (e.dataTransfer.files.length > 0) {
+                handleFile(e.dataTransfer.files[0]);
+            }
+        });
+
+        // Handle paste
+        window.addEventListener('paste', (e) => {
+            const items = e.clipboardData.items;
+            for (let i = 0; i < items.length; i++) {
+                if (items[i].type.indexOf('image') !== -1) {
+                    const file = items[i].getAsFile();
+                    handleFile(file);
+                    break;
+                }
+            }
+        });
+
+        function handleFile(file) {
+            if (!file.type.startsWith('image/')) return;
+            selectedFile = file;
+            
+            // Show preview
+            previewContainer.innerHTML = '';
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const div = document.createElement('div');
+                div.className = 'preview-item';
+                div.innerHTML = `
+                    <img src="${e.target.result}">
+                    <button class="remove-btn" onclick="removeFile()">×</button>
+                `;
+                previewContainer.appendChild(div);
+            };
+            reader.readAsDataURL(file);
+            sendBtn.disabled = false;
+        }
+
+        function removeFile() {
+            selectedFile = null;
+            previewContainer.innerHTML = '';
+            sendBtn.disabled = true;
+            fileInput.value = '';
+        }
+
+        sendBtn.addEventListener('click', async () => {
+            if (!selectedFile) return;
+
+            sendBtn.disabled = true;
+            outputText.innerText = '處理中...';
+            translationArea.style.display = 'none';
+            translationText.innerText = '';
+            copyBtn.style.display = 'none';
+
+            const formData = new FormData();
+            formData.append('image', selectedFile);
+
+            try {
+                const response = await fetch('/process', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!response.ok) throw new Error('伺服器錯誤');
+
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                let result = '';
+                outputText.innerText = '';
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+                    const chunk = decoder.decode(value, { stream: true });
+                    result += chunk;
+                    outputText.innerText = result;
+                }
+
+                // Auto copy to clipboard
+                if (result) {
+                    navigator.clipboard.writeText(result).then(() => {
+                        console.log('已自動複製到剪貼簿');
+                    }).catch(err => {
+                        console.error('自動複製失敗:', err);
+                    });
+                    copyBtn.style.display = 'block';
+
+                    // Auto Google AI Mode logic
+                    if (autoGoogleCheckbox.checked) {
+                        let query = result.trim();
+                        const userPrompt = userPromptInput.value.trim();
+                        if (userPrompt) {
+                            query = userPrompt + ' ' + query;
+                        }
+                        
+                        if (query) {
+                            window.open('https://www.google.com/search?q=' + encodeURIComponent(query) + '&udm=50', '_blank');
+                        }
+                    }
+
+                    // Translate to Traditional Chinese logic
+                    if (translateZhCheckbox.checked) {
+                        translate(result);
+                    }
+                }
+
+            } catch (error) {
+                outputText.innerText = '錯誤: ' + error.message;
+            } finally {
+                sendBtn.disabled = false;
+                removeFile();
+            }
+        });
+
+        async function translate(text) {
+            translationArea.style.display = 'block';
+            translationText.innerText = '翻譯中...';
+            
+            try {
+                const response = await fetch('/translate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ text: text })
+                });
+
+                if (!response.ok) throw new Error('翻譯伺服器錯誤');
+
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                let translationResult = '';
+                translationText.innerText = '';
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+                    const chunk = decoder.decode(value, { stream: true });
+                    translationResult += chunk;
+                    translationText.innerText = translationResult;
+                }
+            } catch (error) {
+                translationText.innerText = '翻譯錯誤: ' + error.message;
+            }
+        }
+
+        copyBtn.addEventListener('click', () => {
+            const text = outputText.innerText;
+            navigator.clipboard.writeText(text);
+        });
+
+        // Handle Enter key to submit
+        window.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !sendBtn.disabled) {
+                sendBtn.click();
+            }
+        });
+    </script>
+</body>
+</html>
